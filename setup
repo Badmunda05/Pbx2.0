@@ -1,0 +1,135 @@
+#!/bin/bash
+
+cjamun='\033[0;35m'
+cparrot='\033[1;32m'
+cgreen='\033[0;32m'
+cblack='\033[0;30m'
+cred='\033[0;31m'
+cskyblue='\033[1;36m'
+cpink='\033[1;35m'
+cblue='\033[1;34m'
+credlight='\033[1;31m'
+cmagenta='\033[0;35m'
+creset='\033[0m'
+
+pprint (){
+    color=$1
+    shift
+    printf "${color}%b${creset}" "$*"
+}
+
+color_reset(){ printf "${creset}"; }
+
+yesnoprompt(){
+    old_stty_cfg=$(stty -g)
+    stty raw -echo ; answer=$(head -c 1)
+    stty $old_stty_cfg
+    echo "$answer" | grep -iq "^y"
+}
+
+# ================= HEADER =================
+
+PBX_HEADER() {
+    echo -e "${cskyblue} ██████╗ ██████╗ ██╗  ██╗  ██████╗    ██████╗ "
+    echo -e "${cpink} ██╔══██╗██╔══██╗╚██╗██╔╝ ██╔═████╗  ██╔═████╗"
+    echo -e "${cskyblue} ██████╔╝██████╔╝ ╚███╔╝  ██║██╔██║  ██║██╔██║"
+    echo -e "${cpink} ██╔═══╝ ██╔══██╗ ██╔██╗  ████╔╝██║  ████╔╝██║"
+    echo -e "${cskyblue} ██║     ██████╔╝██╔╝ ██╗ ╚██████╔╝  ╚██████╔╝"
+    echo -e "${cpink} ╚═╝     ╚═════╝ ╚═╝  ╚═╝  ╚═════╝    ╚═════╝ "
+    echo -e "${cparrot}              PBX 2.0 SETUP${creset}"
+}
+
+clear
+PBX_HEADER
+
+pprint "${cparrot}" "\nWelcome to PBX 2.0 Setup Installer!\n"
+pprint "${cblue}" "If you see any error during Installation Process, Please refer to these files for logs:\n"
+pprint "${cjamun}"   "For node js errors , Checkout nodelog.txt\n"
+pprint "${credlight}"     "For pypi packages errors , Checkout pypilog.txt\n"
+sleep 1
+pprint "${cgreen}"   "\nScript needs sudo privileges in order to update & install packages.\n"
+sudo test
+
+# ================= FUNCTIONS =================
+
+update() {
+    pprint "${cjamun}" "\nUpdating package list.. "
+    sudo apt update 2>&1 | grep "can be upgraded" &>/dev/null
+    if [ $? -eq 0 ]; then
+        pprint "${cgreen}" "UPDATE AVAILABLE"
+        pprint "${cparrot}" "\nDo you want to automatically upgrade (y/n)?"
+        if yesnoprompt; then
+            pprint "${cjamun}" "\nUpgrading packages.. "
+            sudo apt upgrade -y &>/dev/null &&
+            pprint "${cgreen}" "DONE!\n" || (pprint "${cred}" "FAIL.\n"; exit 1)
+        else
+            echo
+        fi
+    else
+        pprint "${cgreen}" "ALREADY UP TO DATE\n"
+    fi
+}
+
+packages(){
+    if ! command -v pip &>/dev/null; then
+        pprint "${cparrot}" "Couldn't find pip, installing now..."
+        sudo apt install python3-pip -y 2>pypilog.txt 1>/dev/null &&
+        pprint "${cgreen}" "SUCCESS.\n" || (pprint "${cpink}" "FAIL.\n"; exit 1)
+    fi
+}
+
+node(){
+    command -v npm &>/dev/null && return
+    pprint "${cmagenta}" "Installing Nodejs and Npm..  "
+    curl -fssL https://deb.nodesource.com/setup_19.x | sudo -E bash - &>nodelog.txt &&
+    sudo apt install -y nodejs &>>nodelog.txt &&
+    sudo npm i -g npm &>>nodelog.txt &&
+    pprint "${cgreen}" "SUCCESS!\n" || (pprint "${cpink}" "FAIL.\n"; exit 1)
+}
+
+installation(){
+    pprint "${cparrot}" "\nUpgrading pip and installing dependency packages..."
+    pip3 install -U pip &>>pypilog.txt &&
+    pip3 install -U -r requirements.txt &>>pypilog.txt &&
+    pprint "${cgreen}" "DONE.\n" && return
+    pprint "${cpink}" "FAIL.\n"
+    exit 1
+}
+
+# ================= RUN =================
+
+update
+packages
+node
+installation
+
+pprint "${cgreen}" "\n\nPBX 2.0 Installation Completed !"
+sleep 1
+clear
+
+PBX_HEADER
+
+# ================= VAR INPUT =================
+
+pprint "${cparrot}"   "\nAPI ID: "; color_reset; read api_id
+pprint "${cpink}"     "\nAPI HASH: "; color_reset; read api_hash
+pprint "${cskyblue}"  "\nBOT TOKEN: "; color_reset; read bot_token
+pprint "${cred}"      "\nDATABASE URL: "; color_reset; read mongo_db
+pprint "${cblue}"     "\nLOG GROUP ID: "; color_reset; read logger
+pprint "${cmagenta}"  "\nOWNER ID: "; color_reset; read ownid
+
+pprint "${cgreen}" "\n\nProcessing your vars, wait a while !"
+
+[ -f .env ] && rm .env
+
+echo """API_ID=$api_id
+API_HASH=$api_hash
+BOT_TOKEN=$bot_token
+DATABASE_URL=$mongo_db
+LOGGER_ID=$logger
+OWNER_ID=$ownid""" > .env
+
+clear
+
+pprint "${cpink}" "\n\nThanks for using PBX 2.0 setup, your vars have been saved successfully!"
+pprint "${cparrot}" "\n\nNow start the bot using:\nchmod +x ./start.sh && ./start.sh\n\n"
