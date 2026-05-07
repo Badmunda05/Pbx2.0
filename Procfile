@@ -1,1 +1,1 @@
-worker: bash setup
+worker: bash herokusetup
