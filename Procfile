@@ -1,1 +1,1 @@
-worker: python3 -m Pbxbot
+worker: bash setup
